@@ -39,14 +39,17 @@ h2{font-size:13px;margin:0 0 10px;letter-spacing:.06em;text-transform:uppercase;
 .row input[type=checkbox]{margin-top:4px;accent-color:var(--accent)}
 .sw{display:flex;gap:6px;align-items:center;justify-content:flex-end;flex-wrap:wrap}
 input[type=number],input[type=text],select,textarea{font:inherit;padding:5px 8px;border:1px solid var(--line);border-radius:4px;background:var(--bg);color:var(--ink)}
-input[type=number]{width:104px;font-family:var(--mono);text-align:right}
+[hidden]{display:none!important}
+input[type=number]{width:104px;font-family:var(--mono);text-align:right;-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 input[type=text]{width:100%}
 textarea{width:100%;min-height:84px;font-family:var(--mono);font-size:12px;resize:vertical}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .btn{font:inherit;padding:6px 12px;border:1px solid var(--accent);background:var(--accent);color:var(--surface);border-radius:4px;cursor:pointer;font-weight:500}
 .btn.ghost{background:transparent;color:var(--accent)}
 .unit{color:var(--mute);font-size:12px}
-.capv{display:inline-block;width:104px;padding:5px 8px;text-align:right;font-family:var(--mono);font-weight:500;font-size:14px}
+.kv .sw>.unit{display:inline-block;min-width:3.6em;text-align:left}
+.capv{display:inline-block;width:104px;padding:5px 8px;border:1px solid transparent;box-sizing:border-box;text-align:right;font-family:var(--mono);font-weight:500;font-size:14px}
 .refs{margin:4px 0 0;padding-left:18px}
 input[readonly]{border-color:transparent;background:transparent;color:var(--ink);font-weight:500;cursor:default}
 .tag{font-size:11px;padding:1px 7px;border-radius:3px;white-space:nowrap;margin-left:6px;font-weight:500}
@@ -235,8 +238,8 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
 
   function normalize(d){
     var o={};
-    if(d.필지){ o.label=[d.입력[0]].concat(d.입력.slice(1).map(function(a){return a.split(' ').pop()})).join(', '); o.area=d.합계면적; o.fr=d.용적률계획_구성||[]; o.zone=d.지구단위계획구역||[]; o.sp=d.특별계획구역||[]; o.ur=Object.keys(d.용도지역||{}); o.ju=d.정비구역등||[]; o.warn=d.경고||[]; }
-    else{ o.label=d.정제주소||d.입력; o.area=d.필지면적; o.fr=(d.용적률계획||[]).map(function(x){var y=Object.assign({},x);y.비율=x.겹침;y.인센티브=x.인센티브코드;return y}); o.zone=(d.지구단위계획구역||[]).map(function(z){return z.이름}); o.sp=(d.특별계획구역||[]).map(function(z){return z.이름}); o.ur=(d.용도지역||[]).map(function(u){return u.이름}); o.ju=(d.정비구역등||[]).filter(function(x){return x.indexOf('정비')>=0}); o.warn=d.경고||[]; }
+    if(d.필지){ var f0=(d.필지[0]&&d.필지[0].정제주소)||d.입력[0]; o.label=f0.replace(/^서울특별시\s*/,'')+(d.입력.length>1?' 외 '+(d.입력.length-1)+'필지':''); o.area=d.합계면적; o.fr=d.용적률계획_구성||[]; o.zone=d.지구단위계획구역||[]; o.sp=d.특별계획구역||[]; o.ur=Object.keys(d.용도지역||{}); o.ju=d.정비구역등||[]; o.warn=d.경고||[]; }
+    else{ o.label=String(d.정제주소||d.입력).replace(/^서울특별시\s*/,''); o.area=d.필지면적; o.fr=(d.용적률계획||[]).map(function(x){var y=Object.assign({},x);y.비율=x.겹침;y.인센티브=x.인센티브코드;return y}); o.zone=(d.지구단위계획구역||[]).map(function(z){return z.이름}); o.sp=(d.특별계획구역||[]).map(function(z){return z.이름}); o.ur=(d.용도지역||[]).map(function(u){return u.이름}); o.ju=(d.정비구역등||[]).filter(function(x){return x.indexOf('정비')>=0}); o.warn=d.경고||[]; }
     return o;
   }
   function applySite(o){
