@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 import settings as cfg
 import lookup_core as lc
-import engine, standard
+import engine, standard, dongcode
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 VERSION = "0.1.0"
@@ -70,7 +70,7 @@ from siteview import site_view, REGISTRY
 # ---------- 엔드포인트 ----------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "version": VERSION, "vworld_key_set": bool(cfg.VWORLD_KEY), "registry_zones": len(REGISTRY)}
+    return {"ok": True, "version": VERSION, "dong_codes": dongcode.info(), "registry_zones": len(REGISTRY)}
 
 @app.post("/api/lookup")
 def api_lookup(body: LookupReq, request: Request):
@@ -123,16 +123,8 @@ def api_registry_full(): return REGISTRY
 @app.get("/api/diagnose")
 def diagnose():
     """배포한 서버에서 외부 서비스에 닿는지 확인 (키는 노출하지 않음)"""
-    out = {"vworld": None, "portal": None}
-    t = time.time()
-    try:
-        pnu, text = lc.vworld_pnu("마포구 노고산동 57-1")
-        out["vworld"] = {"ok": True, "ms": int((time.time() - t) * 1000), "pnu": pnu, "check": "PNU 1144011000100570001 기대" if pnu != "1144011000100570001" else "기대값과 일치"}
-    except lc.LookupError_ as e:
-        out["vworld"] = {"ok": False, "code": e.code, "message": str(e), "hint": {
-            "no_vworld_key": "환경변수 VWORLD_KEY 설정",
-            "upstream_http_403": "서버 IP 차단 또는 키/도메인 불일치(VWORLD_DOMAIN 이 키 발급 때 등록한 도메인인지 확인)",
-            "upstream_unreachable": "서버 외부망 차단 여부 확인"}.get(e.code, "")}
+    dongcode.refresh(force=True)
+    out = {"dong_table": dongcode.info(), "portal": None}
     t = time.time()
     try:
         j = lc.portal_query(1, {"where": "PNU='1144011000100570001'", "outFields": "PNU", "returnGeometry": "false", "f": "json"})
@@ -140,7 +132,8 @@ def diagnose():
         out["portal"] = {"ok": n == 1, "ms": int((time.time() - t) * 1000), "features": n}
     except lc.LookupError_ as e:
         out["portal"] = {"ok": False, "code": e.code, "message": str(e), "hint": "도시공간포털 접속 차단일 수 있음: 다른 호스팅(국내 IDC)에서 재확인하거나 PORTAL_PROXY 환경변수 조정"}
-    out["all_ok"] = bool(out["vworld"] and out["vworld"]["ok"] and out["portal"] and out["portal"]["ok"])
+    dt = out["dong_table"]
+    out["all_ok"] = bool(out["portal"]["ok"]) and dt["count"] >= 400 and (dt["source"] == "api" or not dt["api_key_set"])
     return out
 
 # ---------- 화면 ----------

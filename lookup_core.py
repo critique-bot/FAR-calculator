@@ -1,5 +1,5 @@
 """지번 -> 구역/용적률 조회. 서버용 (캐시, 재시도, 필지 병렬 조회).
-외부 호출은 모두 fetch_json()/vworld_pnu()/portal_query() 세 함수로 모아 테스트에서 교체 가능."""
+외부 호출은 모두 fetch_json()/portal_query() 두 함수로 모아 테스트에서 교체 가능."""
 import json, re, hashlib, time, os, threading
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlencode
@@ -9,6 +9,7 @@ from urllib3.util.retry import Retry
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 import settings as cfg
+import dongcode
 
 class LookupError_(Exception):
     """사용자에게 그대로 보여줄 수 있는 조회 오류"""
@@ -44,19 +45,6 @@ def fetch_json(url, params=None, timeout=25):
         raise LookupError_("외부 서비스 응답 오류 %s (%s)" % (r.status_code, url.split("/")[2]), "upstream_http_%s" % r.status_code)
     try: return r.json()
     except Exception: raise LookupError_("외부 서비스가 JSON이 아닌 응답을 보냈습니다 (%s)" % url.split("/")[2], "upstream_bad_body")
-
-def vworld_pnu(addr):
-    if not cfg.VWORLD_KEY: raise LookupError_("서버에 VWORLD_KEY가 설정되지 않았습니다.", "no_vworld_key")
-    a = addr if addr.startswith("서울") else "서울특별시 " + addr
-    g = fetch_json("https://api.vworld.kr/req/address", {
-        "service": "address", "request": "getcoord", "version": "2.0", "crs": "epsg:4326", "address": a,
-        "refine": "true", "simple": "false", "format": "json", "type": "parcel",
-        "key": cfg.VWORLD_KEY, "domain": cfg.VWORLD_DOMAIN})
-    resp = g.get("response", {})
-    if resp.get("status") != "OK":
-        raise LookupError_("주소를 찾지 못했습니다: %s" % addr, "address_not_found")
-    ref = resp["refined"]
-    return ref["structure"]["level4LC"], ref["text"]
 
 def portal_query(layer, params):
     url = cfg.PORTAL_PROXY + cfg.PORTAL_BASE + "%s/query?" % layer + urlencode(params)
@@ -96,11 +84,17 @@ def lookup(addr):
     c = cache_get(ck)
     if c: c["캐시"] = True; return c
     res = {"입력": addr, "경고": []}
-    pnu, res["정제주소"] = vworld_pnu(addr); res["PNU"] = pnu
-    want, got = addr.split()[-1].replace("번지", ""), res["정제주소"].split()[-1]
-    if want != got: res["경고"].append("입력 지번과 조회된 지번이 다름: %s -> %s" % (want, got))
+    try: a = dongcode.parse(addr)
+    except dongcode.AddressError as e: raise LookupError_(str(e), e.code)
+    pnu = a["pnu"]; res["정제주소"] = a["text"]; res["PNU"] = pnu
     p = portal_query(1, {"where": "PNU='%s'" % pnu, "outFields": "*", "returnGeometry": "true", "outSR": 5174, "f": "json"})
-    if not p.get("features"): raise LookupError_("필지 도형을 찾지 못했습니다 (PNU %s)" % pnu, "parcel_not_found")
+    if not p.get("features"):
+        sug = []
+        try:
+            q2 = portal_query(1, {"where": "PNU LIKE '%s%%'" % a["prefix"], "outFields": "JIBUN", "returnGeometry": "false", "f": "json"})
+            sug = sorted({re.sub(r"[^\d-]", "", f["attributes"]["JIBUN"].replace("산", "")) for f in q2.get("features", [])})[:8]
+        except LookupError_: pass
+        raise LookupError_("%s 에 해당하는 필지가 없습니다.%s" % (a["text"], (" 같은 번지의 다른 지번: " + ", ".join("%d-%s" % (a["bon"], x.split("-")[-1]) if "-" in x else x for x in sug)) if sug else " 지번을 다시 확인하세요."), "parcel_not_found")
     rings = p["features"][0]["geometry"]["rings"]; area = shape(rings).area; res["필지면적"] = round(area, 1)
     z = hits(28, rings, area)
     res["지구단위계획구역"] = [{"이름": a["DGM_NM"], "PRESENT_SN": a["PRESENT_SN"], "겹침": round(ov, 3)} for ov, a in z]
