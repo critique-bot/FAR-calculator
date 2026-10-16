@@ -76,7 +76,11 @@ input[readonly]{border-color:transparent;background:transparent;color:var(--ink)
 .cust{display:grid;grid-template-columns:minmax(0,1.4fr) 110px repeat(3,minmax(70px,.7fr)) 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .cust input[type=number]{width:100%}
 .row.ext{border-top:1px solid var(--line)}
-.row.ext .extin{display:grid;gap:6px;justify-items:end}
+.row.ext .extin{display:grid;gap:6px;justify-items:end;align-content:start}
+.row.ext .res{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+.row.ext .req.ex{color:var(--fg);font-variant-numeric:tabular-nums}
+.row.ext label.chk{display:flex;gap:6px;align-items:center;cursor:pointer}
+.row.ext select{max-width:100%}
 .row.ext .sw.sub input[type=number]{width:70px}
 .row.ext .sw.sub{font-size:12px}
 .cust .hint{grid-column:1/-1;font-size:12px;color:var(--mute);line-height:1.5}
@@ -374,27 +378,112 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     if(!sec.items.length){$('custRows').innerHTML='<div class="req" style="padding:8px 0">이 구간에서 뽑은 항목이 없습니다. 아래 \'항목 추가\'로 직접 입력하세요.</div>';return}
     sec.items.forEach(function(it){addExt(it)});
   }
-  function addExt(it){
-    var i=S.rows.length, rate=it.k==='formula', d=document.createElement('div'); d.className='row ext'; d.dataset.i=i;
-    var pt=parcelTable(it.co), np=(S.site&&S.site.np)||1, BASE=num($('sBase')), auto='', pre='';
-    var kind=rate?'rate':'fixed';
-    if(pt&&/기준용적률\s*[×xX]\s*α/.test(it.f||'')){
-      if(np<2)auto='필지 1개: 해당 없음 (필지 수에 따른 인센티브)';
-      else{var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
-        if(al!=null&&BASE>0){var v=Math.round(BASE*al*100)/100; kind='fixed'; pre=String(v);
-          auto='필지 '+np+'개 → α '+al+' → 기준 '+BASE+' × '+al+' = '+v+'% (자동 입력, 해당하지 않으면 지우세요)';}}
+  // ---- 산식 항목: 산식의 변수를 입력칸으로, 형식별 α는 선택으로 ----
+  function an(a){return Number.isInteger(a)?a.toFixed(1):String(a)}
+  function evalExpr(src,vars){
+    var t=String(src).replace(/[{\[]/g,'(').replace(/[}\]]/g,')').match(/\d+(?:\.\d+)?|[가-힣A-Za-z_]+|[-+*\/()]/g)||[], p=0, bad=false;
+    function ex(){var v=term(); while(t[p]==='+'||t[p]==='-'){var o=t[p++],r=term(); v=o==='+'?v+r:v-r} return v}
+    function term(){var v=fac(); while(t[p]==='*'||t[p]==='/'){var o=t[p++],r=fac(); if(o==='*')v=v*r; else if(r===0){bad=true;v=0} else v=v/r} return v}
+    function fac(){var x=t[p++]; if(x==='('){var v=ex(); if(t[p]===')')p++; else bad=true; return v}
+      if(x==='-')return -fac();
+      if(x==null){bad=true;return 0}
+      if(/^\d/.test(x))return parseFloat(x);
+      if(vars[x]==null){bad=true;return 0} return vars[x]}
+    var v=ex(); if(p<t.length)bad=true; return bad?null:v;
+  }
+  // 항목의 산식을 읽어 입력 구조를 만든다. 읽지 못하면 null (기존 방식으로 표시)
+  function specOf(it){
+    if(it.k!=='formula')return null;
+    var f=String(it.f||'').replace(/\s+/g,' '), m=f.match(/^기준용적률 ?[×xX*] ?(?:(.+?) ?[×xX*] ?)?α$/);
+    if(!m)return null;
+    var expr=m[1]||'', co=it.co||{}, keys=Object.keys(co), opts=[], alpha=null;
+    for(var i=0;i<keys.length;i++){var k=keys[i], v=co[k];
+      if(/필지/.test(k))continue;
+      if(k==='α'){ if(typeof v==='number')alpha=v; continue }
+      if(/\s|기정|변경/.test(k))return null;
+      if(v!==null&&typeof v!=='number')return null;
+      opts.push({n:k,a:v});
     }
+    var vars=[]; (expr.match(/[가-힣A-Za-z_]+/g)||[]).forEach(function(x){if(x!=='대지면적'&&vars.indexOf(x)<0)vars.push(x)});
+    if(!opts.length&&alpha==null)return null;
+    var th=null, tm=String(it.cd||'').match(/([가-힣]*연면적)의 ?(\d+(?:\.\d+)?)% ?이상/);
+    if(tm&&/^\(?[가-힣]+\/[가-힣]*연면적\)?$/.test(expr.replace(/[{}\s]/g,'')))th=+tm[2]/100;
+    return {expr:expr,vars:vars,opts:opts,alpha:alpha,th:th};
+  }
+  function addExt(it){
+    var i=S.rows.length, d=document.createElement('div'); d.className='row ext'; d.dataset.i=i;
+    var sp=specOf(it), pt=parcelTable(it.co), np=(S.site&&S.site.np)||1, BASE0=num($('sBase')), tail='', right;
     var left='<div><div class="nm">'+esc(it.n)+(it.c?'<span class="tag t-info">'+esc(it.c)+'</span>':'')+'</div>'+
-      '<div class="req">'+esc(it.f||'')+(it.m?' · 최대 '+esc(it.m):'')+'</div>'+
-      (auto?'<div class="req"><b>'+esc(auto)+'</b></div>':'')+(it.cd?'<div class="req">'+esc(it.cd)+'</div>':'')+'</div>';
-    var right;
-    if(kind==='rate')
-      right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="0" aria-label="도입 면적"><span class="unit">㎡</span></div>'+
+      '<div class="req">'+esc(it.f||'')+(it.m?' · '+esc(/^최대/.test(it.m)?it.m:'최대 '+it.m):'')+'</div>'+(it.cd?'<div class="req">'+esc(it.cd)+'</div>':'')+'<div class="req ex" id="cs'+i+'"></div></div>';
+    if(pt&&/^기준용적률 ?[×xX*] ?α$/.test(String(it.f||'').replace(/\s+/g,' ').trim())){
+      // 필지 수에 따른 α: 조회한 필지 수로 자동 결정
+      var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
+      d._x={t:'parcel',al:al,np:np,pt:pt,n:it.n};
+      right='<div class="sw"><label class="chk"><input type="checkbox" id="cu'+i+'"'+(np>=2&&al!=null?' checked':' disabled')+'> 적용</label></div>'+
+        '<div class="res" id="cr'+i+'">0.0%</div>';
+    }else if(sp){
+      d._x={t:'sp',sp:sp,n:it.n};
+      var h='';
+      if(sp.opts.length>1){
+        h+='<div class="sw"><select id="co'+i+'" aria-label="형식"><option value="">형식 선택</option>'+sp.opts.map(function(o,j){return '<option value="'+j+'">'+esc(o.n)+(o.a==null?' (대상 아님)':' (α '+an(o.a)+')')+'</option>'}).join('')+'</select></div>';
+      }else if(sp.opts.length===1){
+        h+='<div class="req" style="text-align:right">'+esc(sp.opts[0].n)+' α '+an(sp.opts[0].a)+'</div>';
+      }else if(!sp.vars.length){
+        h+='<div class="sw"><label class="chk"><input type="checkbox" id="cu'+i+'"> 적용</label></div>';
+      }
+      sp.vars.forEach(function(v,j){h+='<div class="sw"><span class="unit">'+esc(v)+'</span><input type="number" id="cv'+i+'_'+j+'" min="0" step="0.1" value="0" aria-label="'+esc(v)+'"><span class="unit">㎡</span></div>'});
+      h+='<div class="res" id="cr'+i+'">0.0%</div>';
+      right=h;
+    }else{
+      // 읽지 못한 산식: 기존 방식(직접 입력)
+      var rate=it.k==='formula';
+      if(rate)right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="0" aria-label="도입 면적"><span class="unit">㎡</span></div>'+
         '<div class="sw sub"><span class="unit">계수 α</span><input type="number" id="cc'+i+'" min="0" step="0.01" value="0"><span class="unit">최대</span><input type="number" id="cm'+i+'" min="0" step="0.1" value="0"><span class="unit">%</span></div>';
-    else
-      right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="'+(pre||0)+'" aria-label="가산 %"><span class="unit">%</span></div><input type="hidden" id="cc'+i+'" value=""><input type="hidden" id="cm'+i+'" value="">';
-    d.innerHTML=left+'<div class="extin">'+right+'</div><input type="hidden" id="cn'+i+'" value="'+esc(it.n)+'"><input type="hidden" id="ck'+i+'" value="'+kind+'">';
+      else right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="0" aria-label="가산 %"><span class="unit">%</span></div><input type="hidden" id="cc'+i+'" value=""><input type="hidden" id="cm'+i+'" value="">';
+      tail='<input type="hidden" id="ck'+i+'" value="'+(rate?'rate':'fixed')+'">';
+    }
+    if(d._x)tail='<input type="hidden" id="ca'+i+'" value="0"><input type="hidden" id="cc'+i+'" value=""><input type="hidden" id="cm'+i+'" value=""><input type="hidden" id="ck'+i+'" value="fixed">';
+    d.innerHTML=left+'<div class="extin">'+right+'</div><input type="hidden" id="cn'+i+'" value="'+esc(it.n)+'">'+tail;
     $('custRows').appendChild(d); S.rows.push(d);
+    if(d._x)updExt(d,i);
+  }
+  // 입력값으로 가산 %를 계산해 숨은 칸(ca)과 화면(cr, cs)에 쓴다
+  function updExt(d,i){
+    var x=d._x, BASE=num($('sBase')), A=num($('area')), alt=S.reg&&S.reg.altArea?num($('areaAlt')):0, v=0, line='', res=0;
+    if(alt&&document.querySelector('input[name=basis]:checked').value==='alt')A=alt;
+    if(x.t==='parcel'){
+      var on=$('cu'+i)&&$('cu'+i).checked;
+      if(x.np<2)line='필지 1개: 해당 없음';
+      else if(x.al==null)line='필지 수에 해당하는 계수 없음';
+      else{res=Math.round(BASE*x.al*100)/100; line='필지 '+x.np+'개 → α '+x.al+' : '+f(BASE,0)+' × '+x.al+' = '+f(res,1)+'%'; if(!on)res=0}
+      v=res;
+    }else{
+      var sp=x.sp, al=null, ok=true, msg='';
+      if(sp.opts.length>1){var sel=$('co'+i).value; if(sel==='')msg='형식을 선택하세요'; else{var o=sp.opts[+sel]; if(o.a==null)msg=o.n+': 대상 아님'; else al=o.a}}
+      else if(sp.opts.length===1){al=sp.opts[0].a}
+      else al=sp.alpha;
+      var on2=!$('cu'+i)||$('cu'+i).checked;
+      if(al!=null&&!msg&&!on2)msg='해당하면 "적용"을 체크하세요';
+      var vv={'대지면적':A}, shown=sp.expr;
+      sp.vars.forEach(function(n,j){vv[n]=num($('cv'+i+'_'+j))});
+      if(al!=null&&!msg){
+        var r=sp.expr?evalExpr(sp.expr,vv):1;
+        if(r==null)msg='면적을 입력하세요';
+        else{
+          if(sp.th!=null&&sp.vars.length===2&&vv[sp.vars[1]]>0&&vv[sp.vars[0]]/vv[sp.vars[1]]<sp.th)msg='연면적의 '+(sp.th*100)+'% 미만: 인정되지 않음';
+          else{
+            res=BASE*r*al;
+            var ex=sp.expr?String(sp.expr).replace(/[가-힣A-Za-z_]+/g,function(w){return f(vv[w],1)}):'';
+            line=f(BASE,0)+(ex?' × '+ex:'')+' × '+an(al)+' = '+f(res,1)+'%';
+          }
+        }
+      }
+      if(msg)line=msg;
+      v=res;
+    }
+    var h=$('ca'+i); if(h)h.value=String(Math.round(v*1000)/1000);
+    if($('cr'+i))$('cr'+i).textContent=f(v,1)+'%';
+    if($('cs'+i))$('cs'+i).textContent=line;
   }
   function numOf(t){var m=String(t||'').match(/(\d+(?:\.\d+)?)\s*(?:%p|%)/);return m?m[1]:''}
   function addCust(pre){
@@ -436,7 +525,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       });
       var oa=$('openArea'); if(oa)oa.textContent='20% = '+f(A*.2,1)+'㎡'+(S.reg.altArea?' / '+f(S.reg.altArea*.2,1)+'㎡('+S.reg.altName+')':'');
     }else{
-      S.rows.forEach(function(d,i){ if(!d)return;
+      S.rows.forEach(function(d,i){ if(!d)return; if(d._x)updExt(d,i);
         var k=$('ck'+i).value,a=num($('ca'+i)),c=num($('cc'+i)),m=num($('cm'+i)),v=0;
         if(k==='fixed')v=m?Math.min(a,m):a; else if(Ac>0){v=BASE*(a/Ac)*c; if(m)v=Math.min(v,m)}
         total+=v;
