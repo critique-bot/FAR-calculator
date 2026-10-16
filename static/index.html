@@ -26,7 +26,7 @@ h2{font-size:13px;margin:0 0 10px;letter-spacing:.06em;text-transform:uppercase;
 .sub{color:var(--mute);margin:0 0 16px}
 .chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px}
 .chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--mute)}
-.grid{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:20px;align-items:start}
+.grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;align-items:start}
 @media (max-width:860px){.grid{grid-template-columns:minmax(0,1fr)}.result{position:static!important}}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:16px;margin-bottom:16px}
 .result{position:sticky;top:calc(12px + env(safe-area-inset-top,0px))}
@@ -86,6 +86,9 @@ input[readonly]{border-color:transparent;background:transparent;color:var(--ink)
 .cust .hint{grid-column:1/-1;font-size:12px;color:var(--mute);line-height:1.5}
 .cust .hint .cat{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:3px;margin-right:4px}
 .extbox{display:grid;gap:6px;margin-bottom:10px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 4px}
+.tab{font:inherit;cursor:pointer;padding:8px 12px;border-radius:8px;border:1px solid var(--line,#3a4a55);background:transparent;color:inherit;opacity:.75;text-align:left}
+.tab.on{opacity:1;border-color:var(--accent,#4fb3bf);font-weight:700}
 .extsel{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .extsel select{max-width:100%;min-width:0}
 .extun summary{cursor:pointer;font-size:12px;color:var(--mute)}
@@ -148,6 +151,19 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       </section>
 
       <section class="card">
+        <h2>결과</h2>
+        <div class="small">허용용적률</div>
+        <div class="big" id="rPermit">-</div>
+        <div class="bar"><i id="rBar"></i></div>
+        <div class="small" id="rBarTxt"></div>
+        <table class="rtable" style="margin-top:12px">
+          <thead><tr><th></th><th>용적률</th><th id="thA">연면적</th><th id="thB" hidden>연면적</th></tr></thead>
+          <tbody id="rRows"></tbody>
+        </table>
+        <ul class="notes" id="rNotes"></ul>
+        <p class="src" style="margin-top:10px">연면적 = 대지면적 × 용적률. 상한 적용 시 대지면적은 부지 제공 후 면적. 인센티브와 허용용적률은 심의에서 확정됩니다.</p>
+      </section>
+      <section class="card">
         <h2>허용용적률 인센티브 <span class="small" style="text-transform:none;letter-spacing:0" id="roomTxt"></span></h2>
         <div id="incList"></div>
         <p class="src" id="incSrc"></p>
@@ -169,21 +185,6 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       </section>
     </main>
 
-    <aside class="result">
-      <section class="card">
-        <h2>결과</h2>
-        <div class="small">허용용적률</div>
-        <div class="big" id="rPermit">-</div>
-        <div class="bar"><i id="rBar"></i></div>
-        <div class="small" id="rBarTxt"></div>
-        <table class="rtable" style="margin-top:12px">
-          <thead><tr><th></th><th>용적률</th><th id="thA">연면적</th><th id="thB" hidden>연면적</th></tr></thead>
-          <tbody id="rRows"></tbody>
-        </table>
-        <ul class="notes" id="rNotes"></ul>
-        <p class="src" style="margin-top:10px">연면적 = 대지면적 × 용적률. 상한 적용 시 대지면적은 부지 제공 후 면적. 인센티브와 허용용적률은 심의에서 확정됩니다.</p>
-      </section>
-    </aside>
   </div>
 </div>
 
@@ -320,9 +321,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
           '<div class="extsel"><select id="extSec">'+secOptions(E)+'</select><span id="extMatch"></span></div>'+
           '<div class="req" id="extCaps"></div><div class="req">출처: '+esc((E.docs||[]).join(', '))+'</div>'+
           (E.un&&E.un.length?'<details class="extun"><summary>확인이 필요한 부분 '+E.un.length+'건</summary><ul>'+E.un.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul></details>':'')+
-          '<div class="req">항목마다 원문 산식을 보고 면적·계수·최대치를 직접 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
+          '<div class="req">항목마다 값을 입력하면 산식으로 계산됩니다. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
       }
-      html=head+'<div id="custRows"></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
+      html=head+'<div class="tabs" id="incTabs" hidden><button type="button" class="tab on" data-t="0"></button><button type="button" class="tab" data-t="1"></button></div><div id="custRows"></div><div id="custRows2" hidden></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
       $('incSrc').textContent='고시의 인센티브표를 보고 항목을 직접 입력합니다. 정량은 가산 %, 정률은 기준용적률 × (도입면적 ÷ 대지면적) × 계수로 계산하고 최대치를 넘지 않습니다.';
     }
     host.innerHTML=html; S.rows=[];
@@ -359,6 +360,20 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     return h;
   }
   function pickSec(E){var c=cands(E); return c.length?c[0]:0}
+  // 결정조서 문구에서 계획유도 최대 비율, 중점(친환경) 최소 비율을 읽는다
+  function shareOf(sec){
+    var p=null,g=null;
+    (sec.caps||[]).forEach(function(t){
+      var m=String(t).match(/100분의 ?(\d+)/); if(!m)return;
+      if(/계획유도/.test(t)&&/초과/.test(t))p=+m[1];
+      else if(/중점/.test(t)&&/의무/.test(t))g=+m[1];
+    });
+    return (p!=null&&g!=null)?{p:p,g:g}:null;
+  }
+  function setTab(n){
+    var b=document.querySelectorAll('#incTabs .tab'); for(var i=0;i<b.length;i++)b[i].classList.toggle('on',i===n);
+    if($('custRows2')){$('custRows2').hidden=n!==1; $('custRows').hidden=n!==0; var ar=$('addRow'); if(ar)ar.parentNode.hidden=n!==0}
+  }
   function parcelTable(co){
     var t=[]; Object.keys(co||{}).forEach(function(k){var m=k.match(/^(\d+)\s*필지/); if(m&&typeof co[k]==='number')t.push([+m[1],co[k]])});
     t.sort(function(a,b){return a[0]-b[0]}); return t.length>=2?t:null;
@@ -374,7 +389,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     else m='<span class="tag t-warn">포털 값·용도지역과 맞지 않는 구간</span>';
     $('extMatch').innerHTML=m;
     $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(esc).join('<br>'):'';
-    $('custRows').innerHTML=''; S.rows=[];
+    $('custRows').innerHTML=''; $('custRows2').innerHTML=''; S.rows=[]; S.secLabel=sec.a||'';
+    S.share=shareOf(sec); var tb=$('incTabs'); tb.hidden=!S.share; setTab(0);
+    if(S.share){var hs=$('custRows2'); hs.innerHTML=''}
     if(!sec.items.length){$('custRows').innerHTML='<div class="req" style="padding:8px 0">이 구간에서 뽑은 항목이 없습니다. 아래 \'항목 추가\'로 직접 입력하세요.</div>';return}
     sec.items.forEach(function(it){addExt(it)});
   }
@@ -394,21 +411,27 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
   // 항목의 산식을 읽어 입력 구조를 만든다. 읽지 못하면 null (기존 방식으로 표시)
   function specOf(it){
     if(it.k!=='formula')return null;
-    var f=String(it.f||'').replace(/\s+/g,' '), m=f.match(/^기준용적률 ?[×xX*] ?(?:(.+?) ?[×xX*] ?)?α$/);
+    var f=String(it.f||'').replace(/\s+/g,' ').trim(), co=it.co||{};
+    var m=f.match(/^기준용적률 ?[×xX*] ?(?:(.+?) ?[×xX*] ?)?(α|\d+(?:\.\d+)?)(?: ?\(특별계획구역 ?: ?(\d+(?:\.\d+)?)\))?$/);
     if(!m)return null;
-    var expr=m[1]||'', co=it.co||{}, keys=Object.keys(co), opts=[], alpha=null;
+    var expr=m[1]||'', keys=Object.keys(co), opts=[], alpha=null, spA=null;
+    if(m[2]!=='α'){alpha=parseFloat(m[2]); if(m[3]!=null)spA=parseFloat(m[3]);
+      if(typeof co['변경']==='number'&&co['변경']!==alpha)return null;
+      if(typeof co['변경(특별계획구역)']==='number'&&spA!=null&&co['변경(특별계획구역)']!==spA)return null}
     for(var i=0;i<keys.length;i++){var k=keys[i], v=co[k];
-      if(/필지/.test(k))continue;
-      if(k==='α'){ if(typeof v==='number')alpha=v; continue }
-      if(/\s|기정|변경/.test(k))return null;
+      if(/필지/.test(k)||k==='기정'||k==='변경'||k==='변경(특별계획구역)')continue;
+      if(k==='α'){ if(typeof v==='number'&&alpha==null)alpha=v; continue }
+      if(/\s/.test(k))return null;
       if(v!==null&&typeof v!=='number')return null;
       opts.push({n:k,a:v});
     }
     var vars=[]; (expr.match(/[가-힣A-Za-z_]+/g)||[]).forEach(function(x){if(x!=='대지면적'&&vars.indexOf(x)<0)vars.push(x)});
     if(!opts.length&&alpha==null)return null;
+    if(opts.length&&alpha!=null)return null;
     var th=null, tm=String(it.cd||'').match(/([가-힣]*연면적)의 ?(\d+(?:\.\d+)?)% ?이상/);
     if(tm&&/^\(?[가-힣]+\/[가-힣]*연면적\)?$/.test(expr.replace(/[{}\s]/g,'')))th=+tm[2]/100;
-    return {expr:expr,vars:vars,opts:opts,alpha:alpha,th:th};
+    var mt=String(it.m||'')+' '+String(it.cd||''), cl=mt.match(/대지면적 ?(\d+(?:\.\d+)?)% ?까지/), cp=mt.match(/기준용적률 ?[×xX] ?(\d+(?:\.\d+)?) ?이내/);
+    return {expr:expr,vars:vars,opts:opts,alpha:alpha,spA:spA,th:th,clamp:cl&&vars.length===1&&/\/ ?대지면적/.test(expr)?+cl[1]/100:null,capK:cp?+cp[1]:null};
   }
   function addExt(it){
     var i=S.rows.length, d=document.createElement('div'); d.className='row ext'; d.dataset.i=i;
@@ -444,7 +467,8 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     }
     if(d._x)tail='<input type="hidden" id="ca'+i+'" value="0"><input type="hidden" id="cc'+i+'" value=""><input type="hidden" id="cm'+i+'" value=""><input type="hidden" id="ck'+i+'" value="fixed">';
     d.innerHTML=left+'<div class="extin">'+right+'</div><input type="hidden" id="cn'+i+'" value="'+esc(it.n)+'">'+tail;
-    $('custRows').appendChild(d); S.rows.push(d);
+    d._tab=(S.share&&/친환경|의무/.test(it.c||''))?1:0;
+    $(d._tab?'custRows2':'custRows').appendChild(d); S.rows.push(d);
     if(d._x)updExt(d,i);
   }
   // 입력값으로 가산 %를 계산해 숨은 칸(ca)과 화면(cr, cs)에 쓴다
@@ -462,19 +486,23 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       if(sp.opts.length>1){var sel=$('co'+i).value; if(sel==='')msg='형식을 선택하세요'; else{var o=sp.opts[+sel]; if(o.a==null)msg=o.n+': 대상 아님'; else al=o.a}}
       else if(sp.opts.length===1){al=sp.opts[0].a}
       else al=sp.alpha;
+      var spMark='';
+      if(sp.spA!=null&&al!=null){var inSp=((S.site&&S.site.sp)||[]).length>0||/특별계획구역/.test(((S.secLabel)||'')); if(inSp){al=sp.spA;spMark='특별계획구역 '}}
       var on2=!$('cu'+i)||$('cu'+i).checked;
       if(al!=null&&!msg&&!on2)msg='해당하면 "적용"을 체크하세요';
       var vv={'대지면적':A}, shown=sp.expr;
       sp.vars.forEach(function(n,j){vv[n]=num($('cv'+i+'_'+j))});
+      var clampMsg=''; if(sp.clamp!=null&&A>0&&vv[sp.vars[0]]>A*sp.clamp){vv[sp.vars[0]]=A*sp.clamp; clampMsg=' (대지면적의 '+(sp.clamp*100)+'%까지만 인정: '+f(vv[sp.vars[0]],1)+'㎡)'}
       if(al!=null&&!msg){
         var r=sp.expr?evalExpr(sp.expr,vv):1;
         if(r==null)msg='면적을 입력하세요';
         else{
           if(sp.th!=null&&sp.vars.length===2&&vv[sp.vars[1]]>0&&vv[sp.vars[0]]/vv[sp.vars[1]]<sp.th)msg='연면적의 '+(sp.th*100)+'% 미만: 인정되지 않음';
           else{
-            res=BASE*r*al;
+            res=BASE*r*al; var capMsg=''; if(sp.capK!=null&&res>BASE*sp.capK){res=BASE*sp.capK; capMsg=' → 기준용적률 × '+sp.capK+' 이내로 제한'}
             var ex=sp.expr?String(sp.expr).replace(/[가-힣A-Za-z_]+/g,function(w){return f(vv[w],1)}):'';
-            line=f(BASE,0)+(ex?' × '+ex:'')+' × '+an(al)+' = '+f(res,1)+'%';
+            line=f(BASE,0)+(ex?' × '+ex:'')+' × '+an(al)+' = '+f(res,1)+'%'+capMsg+clampMsg;
+            if(spMark)line=spMark+'α '+an(al)+': '+line;
           }
         }
       }
@@ -514,7 +542,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     var A=num($('area')), alt=S.reg&&S.reg.altArea?num($('areaAlt')):0;
     var useAlt=alt&&document.querySelector('input[name=basis]:checked').value==='alt';
     var Ac=useAlt?alt:A;
-    var BASE=num($('sBase')), PERMIT=num($('sPermit')), lines=[], total=0, notes=[];
+    var BASE=num($('sBase')), PERMIT=num($('sPermit')), lines=[], total=0, notes=[], tabSum=[0,0];
     if(S.reg){
       S.reg.items.forEach(function(it){
         var v=0;
@@ -528,10 +556,21 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       S.rows.forEach(function(d,i){ if(!d)return; if(d._x)updExt(d,i);
         var k=$('ck'+i).value,a=num($('ca'+i)),c=num($('cc'+i)),m=num($('cm'+i)),v=0;
         if(k==='fixed')v=m?Math.min(a,m):a; else if(Ac>0){v=BASE*(a/Ac)*c; if(m)v=Math.min(v,m)}
-        total+=v;
+        total+=v; tabSum[d._tab||0]+=v;
       });
     }
-    var room=Math.max(0,PERMIT-BASE), applied=Math.min(total,room), permit=BASE+applied;
+    var room=Math.max(0,PERMIT-BASE), inTot=total;
+    if(!S.reg&&S.share&&PERMIT){
+      var lim1=room*S.share.p/100, min2=room*S.share.g/100, g1=Math.min(tabSum[0],lim1), g2=Math.min(tabSum[1],Math.max(0,room-g1));
+      total=g1+g2;
+      if(tabSum[0]>lim1)notes.push(['bad','계획유도 인센티브 입력 '+f(tabSum[0],1)+'%가 최대 '+f(lim1,1)+'%(허용 인센티브량의 '+S.share.p+'%)를 넘어 그 한도까지만 적용했습니다.']);
+      if(tabSum[1]<min2)notes.push(['bad','중점(친환경) 인센티브 '+f(tabSum[1],1)+'%: 의무량 '+f(min2,1)+'%(허용 인센티브량의 '+S.share.g+'%)에 '+f(min2-tabSum[1],1)+'% 부족합니다. 부족분은 계획유도 항목으로 대체할 수 없습니다.']);
+      var tl=document.querySelectorAll('#incTabs .tab');
+      if(tl.length===2){tl[0].textContent='계획유도 인센티브 · '+f(tabSum[0],1)+'% / 최대 '+f(lim1,1)+'%'; tl[1].textContent='중점(친환경) 인센티브 · '+f(tabSum[1],1)+'% / 최소 '+f(min2,1)+'%'}
+    }else if(!S.reg&&S.share){
+      var tl2=document.querySelectorAll('#incTabs .tab'); if(tl2.length===2){tl2[0].textContent='계획유도 인센티브 · '+f(tabSum[0],1)+'% (최대 허용 인센티브량의 '+S.share.p+'%)'; tl2[1].textContent='중점(친환경) 인센티브 · '+f(tabSum[1],1)+'% (최소 허용 인센티브량의 '+S.share.g+'%)'}
+    }
+    var applied=Math.min(total,room), permit=BASE+applied;
     $('roomTxt').textContent=PERMIT?'(한도 허용 − 기준 = '+f(room,1)+'%)':'';
     // 상한
     var legal=num($('sLegal')),mult=num($('sMult')),cap=legal&&mult?legal*mult:0;
@@ -546,15 +585,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     }
     $('rPermit').textContent=PERMIT?f(permit,1)+'%':'-';
     $('rBar').style.width=room?Math.min(100,applied/room*100)+'%':'0';
-    $('rBarTxt').textContent=PERMIT?'인센티브 '+f(total,1)+'% 입력, '+f(applied,1)+'% 적용 (한도 '+f(room,1)+'%)':'허용용적률을 입력하세요';
+    $('rBarTxt').textContent=PERMIT?'인센티브 '+f(inTot,1)+'% 입력, '+f(applied,1)+'% 적용 (한도 '+f(room,1)+'%)':'허용용적률을 입력하세요';
     var altOn=!!alt; $('thB').hidden=!altOn;
     $('thA').textContent='연면적'+(altOn?'(대지)':''); if(altOn)$('thB').textContent='연면적('+S.reg.altName.replace(/ .*/,'')+')';
     function ar(label,p,cls,sub){var a1=(A-(sub?gL:0))*p/100,a2=(alt-(sub?gL:0))*p/100;return '<tr class="'+(cls||'')+'"><td>'+label+'</td><td>'+f(p,1)+'%</td><td>'+f(a1,1)+'</td>'+(altOn?'<td>'+f(a2,1)+'</td>':'')+'</tr>'}
     var rows=ar('기준',BASE)+ar('허용',permit,'hl');
     rows+=anyG?ar('상한',upper,'hl',true):'<tr class="off"><td>상한</td><td>비대상</td><td>-</td>'+(altOn?'<td>-</td>':'')+'</tr>';
     $('rRows').innerHTML=rows;
-    if(total>room&&PERMIT)notes.push(['','인센티브 입력 합계 '+f(total,1)+'%가 한도 '+f(room,1)+'%를 넘어 한도까지만 적용했습니다.']);
-    if(total<room&&total>0)notes.push(['','허용용적률 '+f(PERMIT,0)+'%까지 '+f(room-applied,1)+'% 부족합니다.']);
+    if(inTot>room&&PERMIT&&!(S.share&&!S.reg))notes.push(['','인센티브 입력 합계 '+f(inTot,1)+'%가 한도 '+f(room,1)+'%를 넘어 한도까지만 적용했습니다.']);
+    if(applied<room&&applied>0)notes.push(['','허용용적률 '+f(PERMIT,0)+'%까지 '+f(room-applied,1)+'% 부족합니다.']);
     if(S.reg){S.reg.items.forEach(function(it){var on=(it.kind==='fixed'&&$('c_'+it.id)&&$('c_'+it.id).checked)||(it.kind==='biz'&&$('c_biz')&&$('c_biz').checked); if(it.tag==='warn'&&on)notes.push(['',it.name+': 해석 필요. '+(it.id==='biz'?'비례 환산식이 문서에 없어 업무 100%를 최대치로 적용.':'조성 세부기준은 향후 가이드라인에 따름.')])})}
     if(anyG){
       notes.push(['','상한은 정비계획 또는 지구단위계획 변경에서 결정됩니다. 여기 값은 산식에 따른 참고값입니다.']);
@@ -581,7 +620,8 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
   });
   $('demoBtn').addEventListener('click',function(){load(DEMO);$('loadMsg').textContent='노고산동 57-1~3 예시를 불러왔습니다.'});
   $('pick').addEventListener('change',function(){applySite(S.list[+this.value])});
-  document.addEventListener('click',function(e){if(e.target&&e.target.id==='addRow'){addCust();}});
+  document.addEventListener('click',function(e){if(e.target&&e.target.id==='addRow'){addCust();}
+    var tb=e.target&&e.target.closest&&e.target.closest('#incTabs .tab'); if(tb)setTab(+tb.dataset.t)});
   document.addEventListener('input',function(e){if(e.target&&(e.target.id==='pasteBox'||e.target.id==='addrBox'))return;calc()});
   document.addEventListener('change',function(e){if(e.target&&e.target.id==='pick')return;if(e.target&&e.target.id==='extSec'){var E=extFor();if(E)fillExt(E,+e.target.value)}calc()});
   // ---- 서버 연결 (같은 도메인의 /api) ----
