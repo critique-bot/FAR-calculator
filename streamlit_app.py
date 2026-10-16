@@ -54,7 +54,10 @@ with st.expander("접속 진단"):
         else: st.error(f"법정동 코드표 API 갱신 실패, 예비본 사용 중: {d['error']}")
 
 def show_docs(raw):
-    sns = raw.get("구역SN") or {}
+    sns = dict(raw.get("구역SN") or {})
+    for key in ("지구단위계획구역", "특별계획구역"):
+        for x in raw.get(key) or []:
+            if isinstance(x, dict) and x.get("PRESENT_SN"): sns[x["이름"]] = x["PRESENT_SN"]
     if not sns: return
     with st.expander("인센티브표 원문 (결정조서)", expanded=False):
         st.caption("쪽 번호는 문서 글자에서 자동으로 찾은 값입니다. 최신 고시가 위에 나옵니다. 값은 원문 표로 확인하세요.")
