@@ -248,6 +248,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     var o={};
     if(d.필지){ var f0=(d.필지[0]&&d.필지[0].정제주소)||d.입력[0]; o.label=f0.replace(/^서울특별시\s*/,'')+(d.입력.length>1?' 외 '+(d.입력.length-1)+'필지':''); o.area=d.합계면적; o.fr=d.용적률계획_구성||[]; o.zone=d.지구단위계획구역||[]; o.sp=d.특별계획구역||[]; o.ur=Object.keys(d.용도지역||{}); o.ju=d.정비구역등||[]; o.warn=d.경고||[]; }
     else{ o.label=String(d.정제주소||d.입력).replace(/^서울특별시\s*/,''); o.area=d.필지면적; o.fr=(d.용적률계획||[]).map(function(x){var y=Object.assign({},x);y.비율=x.겹침;y.인센티브=x.인센티브코드;return y}); o.zone=(d.지구단위계획구역||[]).map(function(z){return z.이름}); o.sp=(d.특별계획구역||[]).map(function(z){return z.이름}); o.ur=(d.용도지역||[]).map(function(u){return u.이름}); o.ju=(d.정비구역등||[]).filter(function(x){return x.indexOf('정비')>=0}); o.warn=d.경고||[]; }
+    o.np=d.필지?(d.입력||[]).length:1;
     return o;
   }
   function applySite(o){
@@ -308,7 +309,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       var E=extFor(), head='';
       if(E){
         head='<div class="extbox"><div class="req">결정조서에서 자동으로 뽑은 항목입니다. <span class="tag t-warn">자동추출, 검토 필요</span></div>'+
-          '<div class="extsel"><select id="extSec">'+E.sections.map(function(x,i){return '<option value="'+i+'">'+esc(x.a||('구간 '+(i+1)))+'</option>'}).join('')+'</select><span id="extMatch"></span></div>'+
+          '<div class="extsel"><select id="extSec">'+secOptions(E)+'</select><span id="extMatch"></span></div>'+
           '<div class="req" id="extCaps"></div><div class="req">출처: '+esc((E.docs||[]).join(', '))+'</div>'+
           (E.un&&E.un.length?'<details class="extun"><summary>확인이 필요한 부분 '+E.un.length+'건</summary><ul>'+E.un.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul></details>':'')+
           '<div class="req">항목마다 원문 산식을 보고 면적·계수·최대치를 직접 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
@@ -320,19 +321,49 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     if(!S.reg){var E2=extFor(); if(E2)fillExt(E2,pickSec(E2)); else addCust();}
   }
   function extFor(){var o=S.site; if(!o||!o.zone)return null; for(var i=0;i<o.zone.length;i++){if(EXT[o.zone[i]])return EXT[o.zone[i]]} return null}
-  function pickSec(E){
-    var fr=(S.site.fr||[]).slice().sort(function(a,b){return (b.비율||0)-(a.비율||0)})[0];
-    if(fr){var b=pct(fr.기준).value,p=pct(fr.허용).value;
-      for(var i=0;i<E.sections.length;i++){var x=E.sections[i]; if(x.b!=null&&x.b===b&&x.p!=null&&x.p===p)return i}}
-    return 0;
+  function cands(E){
+    var o=S.site, fr=(o.fr||[]).slice().sort(function(a,b){return (b.비율||0)-(a.비율||0)})[0];
+    var b=fr?pct(fr.기준).value:null, p=fr?pct(fr.허용).value:null, ur=(o.ur||[]).join(' '), hasSp=(o.sp||[]).length>0, out=[];
+    S.byCode=null;
+    var cm=fr&&String(fr.인센티브||'').match(/IN0*(\d+)/);
+    if(cm){var n=+cm[1], hit=[];
+      E.sections.forEach(function(x,i){var m=(x.a||'').match(/^유형\s*(\d+)/); if(m&&+m[1]===n&&(x.b==null||b==null||x.b===b)&&(x.p==null||p==null||x.p===p))hit.push(i)});
+      if(hit.length===1){S.byCode='IN'+('00'+n).slice(-3)+' → 유형'+n; return hit}
+    }
+    E.sections.forEach(function(x,i){
+      var t=x.a||'';
+      if(x.b!=null&&b!=null&&x.b!==b)return;
+      if(x.p!=null&&p!=null&&x.p!==p)return;
+      if(/일반상업/.test(t)&&!/준주거/.test(t)&&ur&&!/일반상업/.test(ur))return;
+      if(/준주거/.test(t)&&!/일반상업/.test(t)&&ur&&!/준주거/.test(ur))return;
+      if(/특별계획구역/.test(t)&&!hasSp)return;
+      out.push(i);
+    });
+    var cur=out.filter(function(i){return !/기정\(종전\)|\[기정/.test(E.sections[i].a||'')});
+    return cur.length?cur:out;
+  }
+  function secOptions(E){
+    var c=cands(E), h='', rest=[];
+    E.sections.forEach(function(x,i){ if(c.indexOf(i)<0)rest.push(i) });
+    function opt(i){return '<option value="'+i+'">'+esc(E.sections[i].a||('구간 '+(i+1)))+'</option>'}
+    if(c.length)h+='<optgroup label="조건에 맞는 구간 '+c.length+'개">'+c.map(opt).join('')+'</optgroup>';
+    if(rest.length)h+='<optgroup label="그 밖의 구간">'+rest.map(opt).join('')+'</optgroup>';
+    return h;
+  }
+  function pickSec(E){var c=cands(E); return c.length?c[0]:0}
+  function parcelTable(co){
+    var t=[]; Object.keys(co||{}).forEach(function(k){var m=k.match(/^(\d+)\s*필지/); if(m&&typeof co[k]==='number')t.push([+m[1],co[k]])});
+    t.sort(function(a,b){return a[0]-b[0]}); return t.length>=2?t:null;
   }
   function fillExt(E,idx){
     var sec=E.sections[idx]; if(!sec){addCust();return}
     var sel=$('extSec'); if(sel)sel.value=String(idx);
-    var fr=(S.site.fr||[]).slice().sort(function(a,b){return (b.비율||0)-(a.비율||0)})[0], m='';
-    if(fr){var b=pct(fr.기준).value,p=pct(fr.허용).value;
-      if(sec.b!=null&&sec.p!=null)m=(sec.b===b&&sec.p===p)?'<span class="tag t-ok">포털 기준·허용과 일치</span>':'<span class="tag t-warn">포털 값 '+(b==null?'-':b)+'/'+(p==null?'-':p)+'와 다름</span>';
-      else m='<span class="tag t-warn">기준·허용을 문서에서 확정하지 못함</span>';}
+    var c=cands(E), m='';
+    if(c.length===1&&c[0]===idx&&S.byCode)m='<span class="tag t-ok">포털 인센티브 코드 '+esc(S.byCode)+' (기준·허용 일치, 코드와 유형의 대응은 추정)</span>';
+    else if(c.length===1&&c[0]===idx)m='<span class="tag t-ok">포털 기준·허용·용도지역과 일치</span>';
+    else if(c.length>1&&c.indexOf(idx)>=0)m='<span class="tag t-warn">같은 조건의 구간 '+c.length+'개: 위치(도면)로 구분해서 선택하세요</span>';
+    else if(!c.length)m='<span class="tag t-warn">조건에 맞는 구간을 찾지 못함</span>';
+    else m='<span class="tag t-warn">포털 값·용도지역과 맞지 않는 구간</span>';
     $('extMatch').innerHTML=m;
     $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(esc).join('<br>'):'';
     $('custRows').innerHTML=''; S.rows=[];
@@ -349,8 +380,17 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     if(pre){
       $('cn'+i).value=pre.n;
       $('ck'+i).value=pre.k==='formula'?'rate':'fixed';
+      var auto='', pt=parcelTable(pre.co), np=(S.site&&S.site.np)||1, BASE=num($('sBase'));
+      if(pt&&/기준용적률\s*[×xX]\s*α/.test(pre.f||'')){
+        if(np<2)auto='필지 1개: 해당 없음 (필지 수에 따른 인센티브)';
+        else{
+          var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
+          if(al!=null&&BASE>0){var v=Math.round(BASE*al*100)/100; $('ck'+i).value='fixed'; $('ca'+i).value=v; $('cm'+i).value='';
+            auto='필지 '+np+'개 → α '+al+' → 기준 '+BASE+' × '+al+' = '+v+'%p (자동 입력, 해당하지 않으면 지우세요)';}
+        }
+      }
       var h=document.createElement('div'); h.className='hint';
-      h.innerHTML='<span class="cat">'+esc(pre.c||'')+'</span> '+esc(pre.f||'')+(pre.m?' · 최대 '+esc(pre.m):'')+(pre.cd?'<br>'+esc(pre.cd):'');
+      h.innerHTML='<span class="cat">'+esc(pre.c||'')+'</span> '+esc(pre.f||'')+(pre.m?' · 최대 '+esc(pre.m):'')+(auto?'<br><b>'+esc(auto)+'</b>':'')+(pre.cd?'<br>'+esc(pre.cd):'');
       d.appendChild(h);
     }
   }
