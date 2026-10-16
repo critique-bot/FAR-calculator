@@ -311,7 +311,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
           '<div class="extsel"><select id="extSec">'+E.sections.map(function(x,i){return '<option value="'+i+'">'+esc(x.a||('구간 '+(i+1)))+'</option>'}).join('')+'</select><span id="extMatch"></span></div>'+
           '<div class="req" id="extCaps"></div><div class="req">출처: '+esc((E.docs||[]).join(', '))+'</div>'+
           (E.un&&E.un.length?'<details class="extun"><summary>확인이 필요한 부분 '+E.un.length+'건</summary><ul>'+E.un.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul></details>':'')+
-          '<div class="req">항목마다 원문 산식을 보고 값을 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
+          '<div class="req">항목마다 원문 산식을 보고 면적·계수·최대치를 직접 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
       }
       html=head+'<div id="custRows"></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
       $('incSrc').textContent='고시의 인센티브표를 보고 항목을 직접 입력합니다. 정량은 가산 %p, 정률은 기준용적률 × (도입면적 ÷ 대지면적) × 계수로 계산하고 최대치를 넘지 않습니다.';
@@ -349,9 +349,6 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     if(pre){
       $('cn'+i).value=pre.n;
       $('ck'+i).value=pre.k==='formula'?'rate':'fixed';
-      var cv=Object.keys(pre.co||{}).map(function(k){return pre.co[k]}).filter(function(v){return typeof v==='number'});
-      if(pre.k==='formula'&&cv.length===1)$('cc'+i).value=cv[0];
-      var mx=numOf(pre.m); if(mx)$('cm'+i).value=mx;
       var h=document.createElement('div'); h.className='hint';
       h.innerHTML='<span class="cat">'+esc(pre.c||'')+'</span> '+esc(pre.f||'')+(pre.m?' · 최대 '+esc(pre.m):'')+(pre.cd?'<br>'+esc(pre.cd):'');
       d.appendChild(h);
