@@ -45,7 +45,8 @@ with st.expander("접속 진단"):
     if st.button("진단 실행"):
         try:
             j = lc.portal_query(1, {"where": "PNU='1144011000100570001'", "outFields": "PNU", "returnGeometry": "false", "f": "json"})
-            st.success("도시공간포털 필지 레이어: 정상") if j.get("features") else st.error("도시공간포털 응답은 왔으나 필지가 비어 있습니다.")
+            if j.get("features"): st.success("도시공간포털 필지 레이어: 정상")
+            else: st.error("도시공간포털 응답은 왔으나 필지가 비어 있습니다.")
         except Exception as e:
             st.error(f"도시공간포털: {e}")
         d = dongcode.refresh(force=True)

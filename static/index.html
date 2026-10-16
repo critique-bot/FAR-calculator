@@ -75,6 +75,10 @@ input[readonly]{border-color:transparent;background:transparent;color:var(--ink)
 .small{font-size:12px;color:var(--mute)} .src{font-size:12px;color:var(--mute);margin-top:6px}
 .cust{display:grid;grid-template-columns:minmax(0,1.4fr) 110px repeat(3,minmax(70px,.7fr)) 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .cust input[type=number]{width:100%}
+.row.ext{border-top:1px solid var(--line)}
+.row.ext .extin{display:grid;gap:6px;justify-items:end}
+.row.ext .sw.sub input[type=number]{width:70px}
+.row.ext .sw.sub{font-size:12px}
 .cust .hint{grid-column:1/-1;font-size:12px;color:var(--mute);line-height:1.5}
 .cust .hint .cat{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:3px;margin-right:4px}
 .extbox{display:grid;gap:6px;margin-bottom:10px}
@@ -300,9 +304,9 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     if(S.reg){
       S.reg.items.forEach(function(it){
         var t=TAGS[it.tag||'info'];
-        if(it.kind==='fixed')html+='<div class="row"><label><input type="checkbox" id="c_'+it.id+'"'+(it.on?' checked':'')+'><span><span class="nm">'+it.name+'</span><span class="tag '+t[1]+'">'+t[0]+'</span><br><span class="req">'+it.req+'</span>'+(it.extra==='open'?'<br><span class="req" id="openArea"></span>':'')+'</span></label><div class="val">+'+it.val+'%p</div></div>';
+        if(it.kind==='fixed')html+='<div class="row"><label><input type="checkbox" id="c_'+it.id+'"'+(it.on?' checked':'')+'><span><span class="nm">'+it.name+'</span><span class="tag '+t[1]+'">'+t[0]+'</span><br><span class="req">'+it.req+'</span>'+(it.extra==='open'?'<br><span class="req" id="openArea"></span>':'')+'</span></label><div class="val">+'+it.val+'%</div></div>';
         else if(it.kind==='biz')html+='<div class="row"><label><input type="checkbox" id="c_biz" checked><span><span class="nm">'+it.name+'</span><span class="tag '+t[1]+'">'+t[0]+'</span><br><span class="req">'+it.req+'</span></span></label><div class="sw"><span class="unit">업무</span><input type="number" id="i_biz" min="0" max="100" step="1" value="100"><span class="unit">%</span></div></div>';
-        else html+='<div class="row"><div><div class="nm">'+it.name+'<span class="tag t-info">사용자입력</span></div><div class="req">'+it.req+' · 계수 '+it.coef+', 최대 '+it.max+'%p</div></div><div class="sw"><input type="number" id="i_'+it.id+'" min="0" step="0.1" value="0"><span class="unit">㎡</span></div></div>';
+        else html+='<div class="row"><div><div class="nm">'+it.name+'<span class="tag t-info">사용자입력</span></div><div class="req">'+it.req+' · 계수 '+it.coef+', 최대 '+it.max+'%</div></div><div class="sw"><input type="number" id="i_'+it.id+'" min="0" step="0.1" value="0"><span class="unit">㎡</span></div></div>';
       });
       $('incSrc').textContent=S.reg.incSrc;
     }else{
@@ -315,7 +319,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
           '<div class="req">항목마다 원문 산식을 보고 면적·계수·최대치를 직접 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
       }
       html=head+'<div id="custRows"></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
-      $('incSrc').textContent='고시의 인센티브표를 보고 항목을 직접 입력합니다. 정량은 가산 %p, 정률은 기준용적률 × (도입면적 ÷ 대지면적) × 계수로 계산하고 최대치를 넘지 않습니다.';
+      $('incSrc').textContent='고시의 인센티브표를 보고 항목을 직접 입력합니다. 정량은 가산 %, 정률은 기준용적률 × (도입면적 ÷ 대지면적) × 계수로 계산하고 최대치를 넘지 않습니다.';
     }
     host.innerHTML=html; S.rows=[];
     if(!S.reg){var E2=extFor(); if(E2)fillExt(E2,pickSec(E2)); else addCust();}
@@ -368,13 +372,35 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(esc).join('<br>'):'';
     $('custRows').innerHTML=''; S.rows=[];
     if(!sec.items.length){$('custRows').innerHTML='<div class="req" style="padding:8px 0">이 구간에서 뽑은 항목이 없습니다. 아래 \'항목 추가\'로 직접 입력하세요.</div>';return}
-    sec.items.forEach(function(it){addCust(it)});
+    sec.items.forEach(function(it){addExt(it)});
+  }
+  function addExt(it){
+    var i=S.rows.length, rate=it.k==='formula', d=document.createElement('div'); d.className='row ext'; d.dataset.i=i;
+    var pt=parcelTable(it.co), np=(S.site&&S.site.np)||1, BASE=num($('sBase')), auto='', pre='';
+    var kind=rate?'rate':'fixed';
+    if(pt&&/기준용적률\s*[×xX]\s*α/.test(it.f||'')){
+      if(np<2)auto='필지 1개: 해당 없음 (필지 수에 따른 인센티브)';
+      else{var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
+        if(al!=null&&BASE>0){var v=Math.round(BASE*al*100)/100; kind='fixed'; pre=String(v);
+          auto='필지 '+np+'개 → α '+al+' → 기준 '+BASE+' × '+al+' = '+v+'% (자동 입력, 해당하지 않으면 지우세요)';}}
+    }
+    var left='<div><div class="nm">'+esc(it.n)+(it.c?'<span class="tag t-info">'+esc(it.c)+'</span>':'')+'</div>'+
+      '<div class="req">'+esc(it.f||'')+(it.m?' · 최대 '+esc(it.m):'')+'</div>'+
+      (auto?'<div class="req"><b>'+esc(auto)+'</b></div>':'')+(it.cd?'<div class="req">'+esc(it.cd)+'</div>':'')+'</div>';
+    var right;
+    if(kind==='rate')
+      right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="0" aria-label="도입 면적"><span class="unit">㎡</span></div>'+
+        '<div class="sw sub"><span class="unit">계수 α</span><input type="number" id="cc'+i+'" min="0" step="0.01" value="0"><span class="unit">최대</span><input type="number" id="cm'+i+'" min="0" step="0.1" value="0"><span class="unit">%</span></div>';
+    else
+      right='<div class="sw"><input type="number" id="ca'+i+'" min="0" step="0.1" value="'+(pre||0)+'" aria-label="가산 %"><span class="unit">%</span></div><input type="hidden" id="cc'+i+'" value=""><input type="hidden" id="cm'+i+'" value="">';
+    d.innerHTML=left+'<div class="extin">'+right+'</div><input type="hidden" id="cn'+i+'" value="'+esc(it.n)+'"><input type="hidden" id="ck'+i+'" value="'+kind+'">';
+    $('custRows').appendChild(d); S.rows.push(d);
   }
   function numOf(t){var m=String(t||'').match(/(\d+(?:\.\d+)?)\s*(?:%p|%)/);return m?m[1]:''}
   function addCust(pre){
     var i=S.rows.length, d=document.createElement('div'); d.className='cust'; d.dataset.i=i;
-    d.innerHTML='<input type="text" placeholder="항목명" id="cn'+i+'"><select id="ck'+i+'"><option value="fixed">정량 %p</option><option value="rate">정률</option></select>'+
-      '<input type="number" id="ca'+i+'" min="0" step="0.1" placeholder="%p 또는 면적㎡"><input type="number" id="cc'+i+'" min="0" step="0.1" placeholder="계수"><input type="number" id="cm'+i+'" min="0" step="1" placeholder="최대 %p"><button class="x" type="button" aria-label="삭제" id="cx'+i+'">×</button>';
+    d.innerHTML='<input type="text" placeholder="항목명" id="cn'+i+'"><select id="ck'+i+'"><option value="fixed">정량 %</option><option value="rate">정률</option></select>'+
+      '<input type="number" id="ca'+i+'" min="0" step="0.1" placeholder="% 또는 면적㎡"><input type="number" id="cc'+i+'" min="0" step="0.1" placeholder="계수"><input type="number" id="cm'+i+'" min="0" step="1" placeholder="최대 %"><button class="x" type="button" aria-label="삭제" id="cx'+i+'">×</button>';
     $('custRows').appendChild(d); S.rows.push(d);
     $('cx'+i).addEventListener('click',function(){d.remove();S.rows[i]=null;calc()});
     if(pre){
@@ -386,7 +412,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
         else{
           var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
           if(al!=null&&BASE>0){var v=Math.round(BASE*al*100)/100; $('ck'+i).value='fixed'; $('ca'+i).value=v; $('cm'+i).value='';
-            auto='필지 '+np+'개 → α '+al+' → 기준 '+BASE+' × '+al+' = '+v+'%p (자동 입력, 해당하지 않으면 지우세요)';}
+            auto='필지 '+np+'개 → α '+al+' → 기준 '+BASE+' × '+al+' = '+v+'% (자동 입력, 해당하지 않으면 지우세요)';}
         }
       }
       var h=document.createElement('div'); h.className='hint';
@@ -417,7 +443,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       });
     }
     var room=Math.max(0,PERMIT-BASE), applied=Math.min(total,room), permit=BASE+applied;
-    $('roomTxt').textContent=PERMIT?'(한도 허용 − 기준 = '+f(room,1)+'%p)':'';
+    $('roomTxt').textContent=PERMIT?'(한도 허용 − 기준 = '+f(room,1)+'%)':'';
     // 상한
     var legal=num($('sLegal')),mult=num($('sMult')),cap=legal&&mult?legal*mult:0;
     $('sCapTxt').textContent=cap?f(cap,0):'-';
@@ -431,15 +457,15 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     }
     $('rPermit').textContent=PERMIT?f(permit,1)+'%':'-';
     $('rBar').style.width=room?Math.min(100,applied/room*100)+'%':'0';
-    $('rBarTxt').textContent=PERMIT?'인센티브 '+f(total,1)+'%p 입력, '+f(applied,1)+'%p 적용 (한도 '+f(room,1)+'%p)':'허용용적률을 입력하세요';
+    $('rBarTxt').textContent=PERMIT?'인센티브 '+f(total,1)+'% 입력, '+f(applied,1)+'% 적용 (한도 '+f(room,1)+'%)':'허용용적률을 입력하세요';
     var altOn=!!alt; $('thB').hidden=!altOn;
     $('thA').textContent='연면적'+(altOn?'(대지)':''); if(altOn)$('thB').textContent='연면적('+S.reg.altName.replace(/ .*/,'')+')';
     function ar(label,p,cls,sub){var a1=(A-(sub?gL:0))*p/100,a2=(alt-(sub?gL:0))*p/100;return '<tr class="'+(cls||'')+'"><td>'+label+'</td><td>'+f(p,1)+'%</td><td>'+f(a1,1)+'</td>'+(altOn?'<td>'+f(a2,1)+'</td>':'')+'</tr>'}
     var rows=ar('기준',BASE)+ar('허용',permit,'hl');
     rows+=anyG?ar('상한',upper,'hl',true):'<tr class="off"><td>상한</td><td>비대상</td><td>-</td>'+(altOn?'<td>-</td>':'')+'</tr>';
     $('rRows').innerHTML=rows;
-    if(total>room&&PERMIT)notes.push(['','인센티브 입력 합계 '+f(total,1)+'%p가 한도 '+f(room,1)+'%p를 넘어 한도까지만 적용했습니다.']);
-    if(total<room&&total>0)notes.push(['','허용용적률 '+f(PERMIT,0)+'%까지 '+f(room-applied,1)+'%p 부족합니다.']);
+    if(total>room&&PERMIT)notes.push(['','인센티브 입력 합계 '+f(total,1)+'%가 한도 '+f(room,1)+'%를 넘어 한도까지만 적용했습니다.']);
+    if(total<room&&total>0)notes.push(['','허용용적률 '+f(PERMIT,0)+'%까지 '+f(room-applied,1)+'% 부족합니다.']);
     if(S.reg){S.reg.items.forEach(function(it){var on=(it.kind==='fixed'&&$('c_'+it.id)&&$('c_'+it.id).checked)||(it.kind==='biz'&&$('c_biz')&&$('c_biz').checked); if(it.tag==='warn'&&on)notes.push(['',it.name+': 해석 필요. '+(it.id==='biz'?'비례 환산식이 문서에 없어 업무 100%를 최대치로 적용.':'조성 세부기준은 향후 가이드라인에 따름.')])})}
     if(anyG){
       notes.push(['','상한은 정비계획 또는 지구단위계획 변경에서 결정됩니다. 여기 값은 산식에 따른 참고값입니다.']);
