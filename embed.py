@@ -3,6 +3,17 @@ import json, os
 from siteview import REGISTRY
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+try: EXT_ALL = json.load(open(os.path.join(HERE, "data", "ext_items.json"), encoding="utf-8"))
+except Exception: EXT_ALL = {}
+
+def _zone_names(raw):
+    out = set()
+    for key in ("지구단위계획구역",):
+        for x in raw.get(key) or []:
+            out.add(x["이름"] if isinstance(x, dict) else x)
+    for p in raw.get("필지") or []:
+        for x in p.get("지구단위계획구역") or []: out.add(x["이름"] if isinstance(x, dict) else x)
+    return out
 
 def _js(obj):
     return json.dumps(obj, ensure_ascii=False).replace("</", "<\\/")
@@ -12,6 +23,6 @@ def build_html(raw):
     html = html.replace("api('/api/health').then(", "Promise.reject().then(", 1)          # 서버 API 연결은 쓰지 않음
     tail = "  load(DEMO);\n})();"
     assert tail in html, "static/index.html 의 시작 코드를 찾지 못했습니다"
-    html = html.replace(tail, "  REG=%s;\n  load([%s]);\n  $('loadMsg').textContent='';\n})();" % (_js(REGISTRY), _js(raw)), 1)
+    html = html.replace(tail, "  REG=%s;\n  EXT=%s;\n  load([%s]);\n  $('loadMsg').textContent='';\n})();" % (_js(REGISTRY), _js({n: EXT_ALL[n] for n in _zone_names(raw) if n in EXT_ALL}), _js(raw)), 1)
     style = "<style>section.card:has(#addrBox){display:none}body{margin:0}</style>"
     return html.replace("</head>", style + "</head>", 1) if "</head>" in html else style + html

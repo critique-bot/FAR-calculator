@@ -75,6 +75,13 @@ input[readonly]{border-color:transparent;background:transparent;color:var(--ink)
 .small{font-size:12px;color:var(--mute)} .src{font-size:12px;color:var(--mute);margin-top:6px}
 .cust{display:grid;grid-template-columns:minmax(0,1.4fr) 110px repeat(3,minmax(70px,.7fr)) 28px;gap:6px;align-items:center;padding:6px 0;border-top:1px solid var(--line)}
 .cust input[type=number]{width:100%}
+.cust .hint{grid-column:1/-1;font-size:12px;color:var(--mute);line-height:1.5}
+.cust .hint .cat{display:inline-block;padding:0 6px;border:1px solid var(--line);border-radius:3px;margin-right:4px}
+.extbox{display:grid;gap:6px;margin-bottom:10px}
+.extsel{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.extsel select{max-width:100%;min-width:0}
+.extun summary{cursor:pointer;font-size:12px;color:var(--mute)}
+.extun ul{margin:6px 0 0;padding-left:18px;font-size:12px;color:var(--mute)}
 .x{border:0;background:transparent;color:var(--mute);cursor:pointer;font-size:16px}
 @media (max-width:640px){.cust{grid-template-columns:1fr 1fr}}
 code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px;border-radius:3px;word-break:break-all}
@@ -234,6 +241,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
   var LEGAL_FAR={'일반상업지역':800}; // 조례 제48조로 확인된 값만 채움
 
   function setRefs(refs,note){var h='';if(refs&&refs.length)h+='<div><b>참고</b></div><ol class="refs">'+refs.map(function(r){return '<li>'+esc(r)+'</li>'}).join('')+'</ol>';if(note)h+='<div>'+esc(note)+'</div>';$('stdSrc').innerHTML=h;}
+  var EXT={};
   var S={reg:null,items:[],rows:[],list:[]};
 
   function normalize(d){
@@ -297,18 +305,57 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
       });
       $('incSrc').textContent=S.reg.incSrc;
     }else{
-      html='<div id="custRows"></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
+      var E=extFor(), head='';
+      if(E){
+        head='<div class="extbox"><div class="req">결정조서에서 자동으로 뽑은 항목입니다. <span class="tag t-warn">자동추출, 검토 필요</span></div>'+
+          '<div class="extsel"><select id="extSec">'+E.sections.map(function(x,i){return '<option value="'+i+'">'+esc(x.a||('구간 '+(i+1)))+'</option>'}).join('')+'</select><span id="extMatch"></span></div>'+
+          '<div class="req" id="extCaps"></div><div class="req">출처: '+esc((E.docs||[]).join(', '))+'</div>'+
+          (E.un&&E.un.length?'<details class="extun"><summary>확인이 필요한 부분 '+E.un.length+'건</summary><ul>'+E.un.map(function(t){return '<li>'+esc(t)+'</li>'}).join('')+'</ul></details>':'')+
+          '<div class="req">항목마다 원문 산식을 보고 값을 입력하세요. 입력하기 전에는 계산에 들어가지 않습니다.</div></div>';
+      }
+      html=head+'<div id="custRows"></div><div style="margin-top:10px"><button class="btn ghost" id="addRow" type="button">항목 추가</button></div>';
       $('incSrc').textContent='고시의 인센티브표를 보고 항목을 직접 입력합니다. 정량은 가산 %p, 정률은 기준용적률 × (도입면적 ÷ 대지면적) × 계수로 계산하고 최대치를 넘지 않습니다.';
     }
     host.innerHTML=html; S.rows=[];
-    if(!S.reg)addCust();
+    if(!S.reg){var E2=extFor(); if(E2)fillExt(E2,pickSec(E2)); else addCust();}
   }
-  function addCust(){
+  function extFor(){var o=S.site; if(!o||!o.zone)return null; for(var i=0;i<o.zone.length;i++){if(EXT[o.zone[i]])return EXT[o.zone[i]]} return null}
+  function pickSec(E){
+    var fr=(S.site.fr||[]).slice().sort(function(a,b){return (b.비율||0)-(a.비율||0)})[0];
+    if(fr){var b=pct(fr.기준).value,p=pct(fr.허용).value;
+      for(var i=0;i<E.sections.length;i++){var x=E.sections[i]; if(x.b!=null&&x.b===b&&x.p!=null&&x.p===p)return i}}
+    return 0;
+  }
+  function fillExt(E,idx){
+    var sec=E.sections[idx]; if(!sec){addCust();return}
+    var sel=$('extSec'); if(sel)sel.value=String(idx);
+    var fr=(S.site.fr||[]).slice().sort(function(a,b){return (b.비율||0)-(a.비율||0)})[0], m='';
+    if(fr){var b=pct(fr.기준).value,p=pct(fr.허용).value;
+      if(sec.b!=null&&sec.p!=null)m=(sec.b===b&&sec.p===p)?'<span class="tag t-ok">포털 기준·허용과 일치</span>':'<span class="tag t-warn">포털 값 '+(b==null?'-':b)+'/'+(p==null?'-':p)+'와 다름</span>';
+      else m='<span class="tag t-warn">기준·허용을 문서에서 확정하지 못함</span>';}
+    $('extMatch').innerHTML=m;
+    $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(esc).join('<br>'):'';
+    $('custRows').innerHTML=''; S.rows=[];
+    if(!sec.items.length){$('custRows').innerHTML='<div class="req" style="padding:8px 0">이 구간에서 뽑은 항목이 없습니다. 아래 \'항목 추가\'로 직접 입력하세요.</div>';return}
+    sec.items.forEach(function(it){addCust(it)});
+  }
+  function numOf(t){var m=String(t||'').match(/(\d+(?:\.\d+)?)\s*(?:%p|%)/);return m?m[1]:''}
+  function addCust(pre){
     var i=S.rows.length, d=document.createElement('div'); d.className='cust'; d.dataset.i=i;
     d.innerHTML='<input type="text" placeholder="항목명" id="cn'+i+'"><select id="ck'+i+'"><option value="fixed">정량 %p</option><option value="rate">정률</option></select>'+
       '<input type="number" id="ca'+i+'" min="0" step="0.1" placeholder="%p 또는 면적㎡"><input type="number" id="cc'+i+'" min="0" step="0.1" placeholder="계수"><input type="number" id="cm'+i+'" min="0" step="1" placeholder="최대 %p"><button class="x" type="button" aria-label="삭제" id="cx'+i+'">×</button>';
     $('custRows').appendChild(d); S.rows.push(d);
     $('cx'+i).addEventListener('click',function(){d.remove();S.rows[i]=null;calc()});
+    if(pre){
+      $('cn'+i).value=pre.n;
+      $('ck'+i).value=pre.k==='formula'?'rate':'fixed';
+      var cv=Object.keys(pre.co||{}).map(function(k){return pre.co[k]}).filter(function(v){return typeof v==='number'});
+      if(pre.k==='formula'&&cv.length===1)$('cc'+i).value=cv[0];
+      var mx=numOf(pre.m); if(mx)$('cm'+i).value=mx;
+      var h=document.createElement('div'); h.className='hint';
+      h.innerHTML='<span class="cat">'+esc(pre.c||'')+'</span> '+esc(pre.f||'')+(pre.m?' · 최대 '+esc(pre.m):'')+(pre.cd?'<br>'+esc(pre.cd):'');
+      d.appendChild(h);
+    }
   }
 
   function calc(){
@@ -384,7 +431,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
   $('pick').addEventListener('change',function(){applySite(S.list[+this.value])});
   document.addEventListener('click',function(e){if(e.target&&e.target.id==='addRow'){addCust();}});
   document.addEventListener('input',function(e){if(e.target&&(e.target.id==='pasteBox'||e.target.id==='addrBox'))return;calc()});
-  document.addEventListener('change',function(e){if(e.target&&e.target.id==='pick')return;calc()});
+  document.addEventListener('change',function(e){if(e.target&&e.target.id==='pick')return;if(e.target&&e.target.id==='extSec'){var E=extFor();if(E)fillExt(E,+e.target.value)}calc()});
   // ---- 서버 연결 (같은 도메인의 /api) ----
   var SRV=false;
   function api(path,opt){return fetch(path,opt).then(function(r){return r.json().then(function(j){j._status=r.status;return j})})}

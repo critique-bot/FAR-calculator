@@ -60,15 +60,13 @@ def show_docs(raw):
             if isinstance(x, dict) and x.get("PRESENT_SN"): sns[x["이름"]] = x["PRESENT_SN"]
     if not sns: return
     with st.expander("인센티브표 원문 (결정조서)", expanded=False):
-        st.caption("쪽 번호는 문서 글자에서 자동으로 찾은 값입니다. 최신 고시가 위에 나옵니다. 값은 원문 표로 확인하세요.")
+        st.caption("최신 고시가 위에 나옵니다. 링크는 인센티브표가 있는 쪽으로 열립니다. 값은 원문 표로 확인하세요.")
         for name, sn in sns.items():
             r = incdocs.for_zone(sn)
             st.markdown("**%s**" % name)
             if not r["docs"]: st.caption(r["note"]); continue
             for d in r["docs"][:4]:
-                pg = ", ".join(("%d" % a if a == b else "%d~%d" % (a, b)) for a, b in d["pages"])
-                first = d["pages"][0][0]
-                st.markdown("- [%s](%s#page=%d)  \n  표가 있는 쪽: %s" % (d["file"], d["url"].replace(" ", "%20"), first, pg))
+                st.markdown("- [%s](%s#page=%d)" % (d["file"], d["url"].replace(" ", "%20"), d["pages"][0][0]))
 
 if SS.raw:
     show_docs(SS.raw)
