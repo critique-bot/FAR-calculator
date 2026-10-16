@@ -13,6 +13,7 @@ os.environ.setdefault("CACHE_DIR", "/tmp/far_cache")
 
 import lookup_core as lc
 import dongcode
+import incdocs
 from embed import build_html
 
 st.set_page_config(page_title="지구단위계획 용적률", layout="wide")
@@ -52,7 +53,22 @@ with st.expander("접속 진단"):
         elif not d["api_key_set"]: st.warning(f"법정동 코드표: 예비본 {d['count']}개 사용 중 (DATA_GO_KEY 미설정 -> 자동 갱신 안 됨)")
         else: st.error(f"법정동 코드표 API 갱신 실패, 예비본 사용 중: {d['error']}")
 
+def show_docs(raw):
+    sns = raw.get("구역SN") or {}
+    if not sns: return
+    with st.expander("인센티브표 원문 (결정조서)", expanded=False):
+        st.caption("쪽 번호는 문서 글자에서 자동으로 찾은 값입니다. 최신 고시가 위에 나옵니다. 값은 원문 표로 확인하세요.")
+        for name, sn in sns.items():
+            r = incdocs.for_zone(sn)
+            st.markdown("**%s**" % name)
+            if not r["docs"]: st.caption(r["note"]); continue
+            for d in r["docs"][:4]:
+                pg = ", ".join(("%d" % a if a == b else "%d~%d" % (a, b)) for a, b in d["pages"])
+                first = d["pages"][0][0]
+                st.markdown("- [%s](%s#page=%d)  \n  표가 있는 쪽: %s" % (d["file"], d["url"].replace(" ", "%20"), first, pg))
+
 if SS.raw:
+    show_docs(SS.raw)
     components.html(build_html(SS.raw), height=2000, scrolling=True)
 else:
     st.info("지번을 조회하면 계산 화면이 나타납니다.")

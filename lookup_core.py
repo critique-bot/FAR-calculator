@@ -138,6 +138,7 @@ def group(addrs):
         n = sorted({x["이름"] for p in ps for x in p[key]}); g[key] = n
         if len(n) > 1 or (n and any(not p[key] for p in ps)):
             g["경고"].append("%s이(가) 필지마다 다름: %s" % (key, n))
+    g["구역SN"] = {x["이름"]: x["PRESENT_SN"] for p in ps for key in ("지구단위계획구역", "특별계획구역") for x in p[key]}
     g["정비구역등"] = sorted({x for p in ps for x in p["정비구역등"] if "정비" in x})
     ur = {}
     for p in ps:
