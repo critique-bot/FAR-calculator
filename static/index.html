@@ -388,7 +388,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     else if(!c.length)m='<span class="tag t-warn">조건에 맞는 구간을 찾지 못함</span>';
     else m='<span class="tag t-warn">포털 값·용도지역과 맞지 않는 구간</span>';
     $('extMatch').innerHTML=m;
-    $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(esc).join('<br>'):'';
+    $('extCaps').innerHTML=(sec.caps&&sec.caps.length)?'<b>합계·분류별 상한</b><br>'+sec.caps.map(fmtLines).join('<br>'):'';
     $('custRows').innerHTML=''; $('custRows2').innerHTML=''; S.rows=[]; S.secLabel=sec.a||'';
     S.share=shareOf(sec); var tb=$('incTabs'); tb.hidden=!S.share; setTab(0);
     if(S.share){var hs=$('custRows2'); hs.innerHTML=''}
@@ -396,6 +396,11 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     sec.items.forEach(function(it){addExt(it)});
   }
   // ---- 산식 항목: 산식의 변수를 입력칸으로, 형식별 α는 선택으로 ----
+  // 긴 조건 문구를 읽기 쉽게 줄바꿈: ';'와 ' / '로 이어붙은 조목을 나누고, [구분] 뒤에 ' : '를 붙인다
+  function fmtLines(t){
+    return String(t||'').split(/\s*;\s*|\s+\/\s+/).map(function(x){return x.trim()}).filter(Boolean)
+      .map(function(x){return esc(x.replace(/^(\[[^\]]+\])\s*:?\s*(?=\S)/,'$1 : '))}).join('<br>');
+  }
   function an(a){return Number.isInteger(a)?a.toFixed(1):String(a)}
   function evalExpr(src,vars){
     var t=String(src).replace(/[{\[]/g,'(').replace(/[}\]]/g,')').match(/\d+(?:\.\d+)?|[가-힣A-Za-z_]+|[-+*\/()]/g)||[], p=0, bad=false;
@@ -437,7 +442,7 @@ code{font-family:var(--mono);font-size:12px;background:var(--bg);padding:1px 5px
     var i=S.rows.length, d=document.createElement('div'); d.className='row ext'; d.dataset.i=i;
     var sp=specOf(it), pt=parcelTable(it.co), np=(S.site&&S.site.np)||1, BASE0=num($('sBase')), tail='', right;
     var left='<div><div class="nm">'+esc(it.n)+(it.c?'<span class="tag t-info">'+esc(it.c)+'</span>':'')+'</div>'+
-      '<div class="req">'+esc(it.f||'')+(it.m?' · '+esc(/^최대/.test(it.m)?it.m:'최대 '+it.m):'')+'</div>'+(it.cd?'<div class="req">'+esc(it.cd)+'</div>':'')+'<div class="req ex" id="cs'+i+'"></div></div>';
+      '<div class="req">'+esc(it.f||'')+(it.m?' · '+esc(/^최대/.test(it.m)?it.m:'최대 '+it.m):'')+'</div>'+(it.cd?'<div class="req">'+fmtLines(it.cd)+'</div>':'')+'<div class="req ex" id="cs'+i+'"></div></div>';
     if(pt&&/^기준용적률 ?[×xX*] ?α$/.test(String(it.f||'').replace(/\s+/g,' ').trim())){
       // 필지 수에 따른 α: 조회한 필지 수로 자동 결정
       var al=null; pt.forEach(function(r){if(np>=r[0])al=r[1]});
